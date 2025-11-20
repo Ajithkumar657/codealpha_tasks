@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Responsive Image Gallery</title>
+  <style>
+    :root{--bg:#0f172a;--card:#0b1220;--muted:#94a3b8;--accent:#7c3aed;--gap:16px;--radius:12px}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#e6eef8;background:linear-gradient(180deg,#081226 0%, #071026 100%)}
+    a{color:inherit}
+    .wrap{max-width:1200px;margin:28px auto;padding:20px}
+    /* HEADER: left-aligned structured layout */
+    header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px}
+    /* left nav container stacks title + controls */
+    .nav-left{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+    header h1{font-size:20px;margin:0}
+    /* compact panel with minimal background for controls */
+    .nav-panel{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+               background:rgba(255,255,255,0.02);border-radius:12px;padding:8px;border:1px solid rgba(255,255,255,0.03)}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.04);padding:8px 12px;border-radius:10px;color:var(--muted);cursor:pointer;transition:all .22s}
+    .btn:hover{transform:translateY(-3px);box-shadow:0 6px 18px rgba(2,6,23,0.6);color:#fff}
+    .btn.active{background:linear-gradient(90deg,var(--accent),#4f46e5);color:#fff;border:0}
+    .select{padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted)}
+    .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--gap)}
+    .card{position:relative;background:var(--card);border-radius:12px;overflow:hidden;cursor:pointer;transition:transform .28s,box-shadow .28s}
+    .card:focus{outline:2px solid rgba(124,58,237,0.35)}
+    .card:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(2,6,23,0.7)}
+    .card img{width:100%;height:180px;object-fit:cover;display:block;transition:transform .5s ease,filter .35s}
+    .meta{position:absolute;left:12px;right:12px;bottom:12px;padding:8px 10px;background:linear-gradient(180deg,transparent,rgba(2,6,23,0.6));color:#fff;border-radius:8px;display:flex;justify-content:space-between;align-items:center;font-size:13px}
+    .card:hover img{transform:scale(1.06)}
+    .lightbox{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.7);z-index:1200;padding:20px}
+    .lightbox.open{display:flex}
+    .lb-inner{max-width:1100px;width:100%;background:rgba(12,16,25,0.95);border-radius:12px;padding:14px;box-shadow:0 30px 80px rgba(2,6,23,0.7);display:flex;gap:12px;align-items:center}
+    .lb-img{flex:1;min-height:320px;display:flex;align-items:center;justify-content:center}
+    .lb-img img{max-width:100%;max-height:75vh;border-radius:8px}
+    .lb-side{width:300px;display:flex;flex-direction:column;gap:8px}
+    .lb-title{font-size:18px;color:#fff;margin:0}
+    .lb-desc{color:var(--muted);font-size:13px}
+    .nav{display:flex;gap:8px}
+    .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px;border-radius:10px;color:var(--muted);cursor:pointer}
+    .icon-btn:hover{color:#fff}
+    @media (max-width:700px){.lb-inner{flex-direction:column}.lb-side{width:100%}.card img{height:150px}}
+    .badge{background:rgba(0,0,0,0.45);padding:6px 8px;border-radius:999px;font-size:12px;color:#fff}
+    .card.hidden{opacity:0;transform:scale(.98);pointer-events:none;height:0;padding:0;margin:0}
+    .filter-grayscale img{filter:grayscale(1) contrast(.95)}
+    .filter-sepia img{filter:sepia(.35) contrast(.95)}
+    .filter-vibrant img{filter:saturate(1.2) contrast(1.02)}
+    .hint{font-size:12px;color:var(--muted);margin-left:8px}
+    /* favorite heart */
+    .fav-btn{position:absolute;top:10px;right:10px;z-index:5;background:rgba(0,0,0,0.35);border-radius:999px;padding:8px;display:inline-flex;align-items:center;justify-content:center;border:0;color:var(--muted);cursor:pointer;transition:transform .18s}
+    .fav-btn:hover{transform:scale(1.06);color:#fff}
+    .fav-btn.active{color:#ff6584}
+    /* favorites panel */
+    .panel{margin-top:18px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:12px;display:none}
+    .panel.open{display:block}
+    .panel .actions{display:flex;gap:8px;align-items:center}
+    .empty{color:var(--muted);padding:26px;text-align:center;border:1px dashed rgba(255,255,255,0.03);border-radius:10px}
+
+    /* small right-side header area (keeps hint or extra items) */
+    .header-right{display:flex;align-items:center;gap:8px}
+    @media (max-width:860px){
+      /* collapse header into single column on smaller screens */
+      header{flex-direction:column;align-items:stretch}
+      .header-right{justify-content:flex-start}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <!-- LEFT-ALIGNED structured nav: title + compact control panel -->
+      <div class="nav-left">
+        <h1>Image Gallery</h1>
+
+        <!-- compact panel gives a minimal background for the navigation controls -->
+        <div class="nav-panel">
+          <div role="toolbar" aria-label="category filters" class="controls">
+            <button class="btn active" data-filter="all">All</button>
+            <button class="btn" data-filter="nature">Nature</button>
+            <button class="btn" data-filter="city">City</button>
+            <button class="btn" data-filter="people">People</button>
+          </div>
+
+          <select id="filterStyle" class="select" title="Image style filters">
+            <option value="none">No image filter</option>
+            <option value="filter-grayscale">Grayscale</option>
+            <option value="filter-sepia">Sepia</option>
+            <option value="filter-vibrant">Vibrant</option>
+          </select>
+
+          <button class="btn" id="viewFavBtn" title="View Favorites">♥ Favorites</button>
+        </div>
+      </div>
+
+      <!-- Right side kept minimal (hint or future user-area) -->
+      <div class="header-right">
+        <div class="hint">Use ← / → to navigate</div>
+      </div>
+    </header>
+
+    <main>
+      <section class="gallery" id="gallery">
+        <!-- cards (unchanged) -->
+        <article class="card" tabindex="0" data-id="1" data-category="nature" data-title="Misty Mountains" data-desc="A calm view of misty peaks at dawn" data-src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Misty mountains" src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Misty Mountains</span><span class="badge">Nature</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="2" data-category="city" data-title="Neon Street" data-desc="Evening street with neon lights" data-src="https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Neon street" src="https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Neon Street</span><span class="badge">City</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="3" data-category="people" data-title="Portrait" data-desc="Candid portrait of a person looking away" data-src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Portrait" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Portrait</span><span class="badge">People</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="4" data-category="nature" data-title="Forest Trail" data-desc="Green trail through dense forest" data-src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Forest trail" src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Forest Trail</span><span class="badge">Nature</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="5" data-category="city" data-title="Old Town" data-desc="Cobblestone lanes and warm lights" data-src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Old town" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Old Town</span><span class="badge">City</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="6" data-category="people" data-title="Laughing Kid" data-desc="A kid laughing on a sunny day" data-src="https://images.unsplash.com/photo-1531123414780-f0b0f3a0b6d0?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Laughing kid" src="https://images.unsplash.com/photo-1531123414780-f0b0f3a0b6d0?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Laughing Kid</span><span class="badge">People</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="7" data-category="nature" data-title="Desert Dunes" data-desc="Rolling dunes under a wide sky" data-src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Desert dunes" src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Desert Dunes</span><span class="badge">Nature</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="8" data-category="city" data-title="Bridge" data-desc="A modern bridge silhouetted at sunset" data-src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Bridge" src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Bridge</span><span class="badge">City</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="9" data-category="people" data-title="Musician" data-desc="Street musician playing guitar" data-src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Musician" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Musician</span><span class="badge">People</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="10" data-category="nature" data-title="Lake View" data-desc="Still lake reflecting mountains" data-src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Lake view" src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Lake View</span><span class="badge">Nature</span></div>
+        </article>
+
+        <article class="card" tabindex="0" data-id="11" data-category="city" data-title="Rooftop" data-desc="City skyline from a rooftop" data-src="https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=1200&q=80">
+          <button class="fav-btn" aria-label="toggle favorite">♡</button>
+          <img loading="lazy" alt="Rooftop" src="https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=800&q=60">
+          <div class="meta"><span>Rooftop</span><span class="badge">City</span></div>
+        </article>
+      </section>
+
+      <!-- Favorites panel (shows when user clicks Favorites) -->
+      <section class="panel" id="favoritesPanel" aria-hidden="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <strong>Favorites</strong>
+          <div class="actions">
+            <button class="btn" id="exportFav">Export JSON</button>
+            <button class="btn" id="clearFav">Clear All</button>
+            <button class="btn" id="closeFav">Close</button>
+          </div>
+        </div>
+        <div id="favGridContainer"></div>
+      </section>
+
+    </main>
+
+    <div class="lightbox" id="lightbox" aria-hidden="true" role="dialog" aria-label="Image lightbox">
+      <div class="lb-inner" role="document">
+        <div class="lb-img"><img id="lb-image" alt="Expanded view"></div>
+        <div class="lb-side">
+          <h2 id="lb-title" class="lb-title"></h2>
+          <p id="lb-desc" class="lb-desc"></p>
+          <div class="nav">
+            <button class="icon-btn" id="prevBtn" aria-label="previous image">◀ Prev</button>
+            <button class="icon-btn" id="nextBtn" aria-label="next image">Next ▶</button>
+            <button class="icon-btn" id="closeBtn" aria-label="close lightbox">✕ Close</button>
+          </div>
+          <div style="margin-top:12px;color:var(--muted);font-size:13px">Tip: press <kbd>Esc</kbd> to close</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer style="text-align:center;padding:16px;color:var(--muted)">© Vaddepally Ajith Kumar</footer>
+
+  <script>
+    (function(){
+      const gallery = document.getElementById('gallery');
+      const cards = Array.from(gallery.querySelectorAll('.card'));
+      const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
+      const styleSelect = document.getElementById('filterStyle');
+      const lb = document.getElementById('lightbox');
+      const lbImg = document.getElementById('lb-image');
+      const lbTitle = document.getElementById('lb-title');
+      const lbDesc = document.getElementById('lb-desc');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const closeBtn = document.getElementById('closeBtn');
+      const viewFavBtn = document.getElementById('viewFavBtn');
+      const favoritesPanel = document.getElementById('favoritesPanel');
+      const favGridContainer = document.getElementById('favGridContainer');
+      const exportFav = document.getElementById('exportFav');
+      const clearFav = document.getElementById('clearFav');
+      const closeFav = document.getElementById('closeFav');
+
+      let visibleCards = cards.slice();
+      let currentIndex = 0;
+
+      // --- Favorites storage ---
+      const STORAGE_KEY = 'codealpha_favorites_v1';
+      function loadFavorites(){
+        try{const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []}catch(e){return []}
+      }
+      function saveFavorites(list){ localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+      function isFav(id){ return loadFavorites().includes(String(id)); }
+      function addFav(id){ const list = loadFavorites(); if(!list.includes(String(id))){ list.push(String(id)); saveFavorites(list); } }
+      function removeFav(id){ let list = loadFavorites().filter(x=>x!==String(id)); saveFavorites(list); }
+
+      // Initialize favorite buttons state
+      function updateFavButtons(){ cards.forEach(card=>{
+        const btn = card.querySelector('.fav-btn');
+        if(isFav(card.dataset.id)){
+          btn.classList.add('active'); btn.textContent = '♥'; btn.setAttribute('aria-pressed','true');
+        } else { btn.classList.remove('active'); btn.textContent = '♡'; btn.setAttribute('aria-pressed','false'); }
+      }) }
+
+      // Toggle favorite on click
+      gallery.addEventListener('click', (e)=>{
+        const favBtn = e.target.closest('.fav-btn');
+        if(!favBtn) return;
+        const card = favBtn.closest('.card');
+        const id = card.dataset.id;
+        if(isFav(id)){ removeFav(id); } else { addFav(id); }
+        updateFavButtons();
+        e.stopPropagation();
+      });
+
+      // Apply category filter
+      function applyCategoryFilter(cat){
+        filterButtons.forEach(b=>b.classList.toggle('active', b.dataset.filter === cat));
+        visibleCards = cat === 'all' ? cards.slice() : cards.filter(c=>c.dataset.category === cat);
+        cards.forEach(c=>{ if(cat === 'all' || c.dataset.category === cat){ c.classList.remove('hidden') } else { c.classList.add('hidden') } })
+      }
+
+      // Apply image style filter (bonus)
+      styleSelect.addEventListener('change', e=>{
+        const cls = e.target.value;
+        gallery.classList.remove('filter-grayscale','filter-sepia','filter-vibrant');
+        if(cls && cls !== 'none') gallery.classList.add(cls);
+      })
+
+      filterButtons.forEach(btn=>btn.addEventListener('click', ()=>applyCategoryFilter(btn.dataset.filter)));
+
+      // Open lightbox
+      function openLightbox(idx){
+        const card = visibleCards[idx]; if(!card) return;
+        const src = card.dataset.src || card.querySelector('img').src;
+        lbImg.src = src; lbImg.alt = card.dataset.title || '';
+        lbTitle.textContent = card.dataset.title || '';
+        lbDesc.textContent = card.dataset.desc || '';
+        currentIndex = idx; lb.classList.add('open'); lb.setAttribute('aria-hidden','false'); closeBtn.focus();
+      }
+      function closeLightbox(){ lb.classList.remove('open'); lb.setAttribute('aria-hidden','true'); }
+      function showPrev(){ currentIndex = (currentIndex - 1 + visibleCards.length) % visibleCards.length; openLightbox(currentIndex); }
+      function showNext(){ currentIndex = (currentIndex + 1) % visibleCards.length; openLightbox(currentIndex); }
+
+      cards.forEach(card=>{
+        card.addEventListener('click', ()=>{
+          visibleCards = Array.from(gallery.querySelectorAll('.card:not(.hidden)'));
+          const idx = visibleCards.indexOf(card);
+          openLightbox(idx);
+        });
+        card.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); } });
+      });
+
+      prevBtn.addEventListener('click', showPrev); nextBtn.addEventListener('click', showNext); closeBtn.addEventListener('click', closeLightbox);
+      lb.addEventListener('click', (e)=>{ if(e.target === lb) closeLightbox(); });
+      document.addEventListener('keydown', (e)=>{ if(!lb.classList.contains('open')) return; if(e.key === 'ArrowLeft') showPrev(); if(e.key === 'ArrowRight') showNext(); if(e.key === 'Escape') closeLightbox(); });
+
+      const observer = new MutationObserver(()=>{ visibleCards = Array.from(gallery.querySelectorAll('.card:not(.hidden)')); });
+      observer.observe(gallery,{attributes:true,subtree:true,attributeFilter:['class']});
+
+      // --- Favorites panel handling ---
+      function renderFavoritesPanel(){
+        const favIds = loadFavorites();
+        favGridContainer.innerHTML = '';
+        if(favIds.length === 0){ favGridContainer.innerHTML = '<div class="empty">No favorites yet — click the ♥ on any image to add it here.</div>'; return; }
+        const frag = document.createDocumentFragment();
+        favIds.forEach(id=>{
+          const card = cards.find(c=>c.dataset.id === String(id));
+          if(!card) return;
+          const clone = card.cloneNode(true);
+          // remove tabindex to avoid double focus issues
+          clone.querySelector('.fav-btn').addEventListener('click', ()=>{ removeFav(id); renderFavoritesPanel(); updateFavButtons(); });
+          // clicking clone image opens lightbox focusing that image in the main gallery
+          clone.addEventListener('click', ()=>{
+            // make visibleCards equal to favorites list for navigation
+            visibleCards = Array.from(favGridContainer.querySelectorAll('.card'));
+            // find index within favorites
+            const idx = Array.from(favGridContainer.children).indexOf(clone);
+            // open a temporary lightbox using original card data
+            const original = cards.find(c=>c.dataset.id === String(id));
+            if(original){ const src = original.dataset.src || original.querySelector('img').src; lbImg.src = src; lbTitle.textContent = original.dataset.title; lbDesc.textContent = original.dataset.desc; lb.classList.add('open'); lb.setAttribute('aria-hidden','false'); }
+          });
+          frag.appendChild(clone);
+        });
+        favGridContainer.appendChild(frag);
+      }
+
+      viewFavBtn.addEventListener('click', ()=>{
+        const open = favoritesPanel.classList.toggle('open');
+        favoritesPanel.setAttribute('aria-hidden', String(!open));
+        if(open){ renderFavoritesPanel(); }
+      });
+
+      exportFav.addEventListener('click', ()=>{
+        const favIds = loadFavorites();
+        const data = favIds.map(id=>{
+          const c = cards.find(x=>x.dataset.id === String(id));
+          return c ? {id: c.dataset.id, title: c.dataset.title, desc: c.dataset.desc, src: c.dataset.src } : null;
+        }).filter(Boolean);
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'favorites.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      });
+
+      clearFav.addEventListener('click', ()=>{ if(confirm('Clear all favorites?')){ saveFavorites([]); updateFavButtons(); renderFavoritesPanel(); } });
+      closeFav.addEventListener('click', ()=>{ favoritesPanel.classList.remove('open'); favoritesPanel.setAttribute('aria-hidden','true'); });
+
+      // accessibility: trap focus inside lightbox
+      document.addEventListener('focus', function(e){ if(!lb.classList.contains('open')) return; if(!lb.contains(e.target)){ e.stopPropagation(); closeBtn.focus(); } }, true);
+
+      // initial state
+      updateFavButtons(); applyCategoryFilter('all');
+
+    })();
+  </script>
+</body>
+</html>
